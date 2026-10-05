@@ -26,7 +26,6 @@ public class Asistente {
     @Column(nullable = false)
     private Integer edad;
 
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "charla_id")
     @JsonIgnore

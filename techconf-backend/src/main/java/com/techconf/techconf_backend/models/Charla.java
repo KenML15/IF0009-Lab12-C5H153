@@ -34,6 +34,9 @@ public class Charla {
     @Column(name = "etiqueta")
     private List<String> etiquetas = new ArrayList<>();
 
+    @OneToMany(mappedBy = "charla", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Asistente> asistentes = new ArrayList<>();
+
     public Charla() {}
 
     public Long getId() { return id; }
@@ -52,4 +55,11 @@ public class Charla {
     public void setFechaFin(LocalDate fechaFin) { this.fechaFin = fechaFin; }
     public List<String> getEtiquetas() { return etiquetas; }
     public void setEtiquetas(List<String> etiquetas) { this.etiquetas = etiquetas; }
+     public List<Asistente> getAsistentes() { return asistentes; }
+    public void setAsistentes(List<Asistente> asistentes) { this.asistentes = asistentes; }
+
+    public void agregarAsistente(Asistente asistente) {
+        asistentes.add(asistente);
+        asistente.setCharla(this);
+    }
 }
