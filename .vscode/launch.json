@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-TechconfBackendApplication<techconf-backend>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.techconf.techconf_backend.TechconfBackendApplication",
+            "projectName": "techconf-backend",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
