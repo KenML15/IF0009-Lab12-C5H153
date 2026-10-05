@@ -1,59 +1,112 @@
-# TechconfFrontend
+# IF0009 - Laboratorio 12: TechConf Full-Stack
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.1.
+**Estudiante:** [Su nombre completo]
+**Carné:** C5H153
+**Curso:** IF0009 - Desarrollo de Software IV
+**Profesor:** Mag. Jonathan Granados C.
+**Semestre:** II-2026
 
-## Development server
+Sistema de registro de charlas para una conferencia tecnológica (TechConf), extendido con
+inscripción de asistentes mediante una relación 1:N en Spring Boot y formularios reactivos
+anidados en Angular.
 
-To start a local development server, run:
+## Tecnologías
 
+| Capa | Tecnología |
+|---|---|
+| Back-End | Java 25, Spring Boot 4.1.1, Spring Data JPA, Bean Validation, H2 (en memoria) |
+| Front-End | Angular (standalone, Reactive Forms, Signals) |
+| Control de versiones | Git + GitHub |
+
+## Estructura del repositorio
+
+IF0009-Lab12-C5H153/
+├── techconf-backend/ API REST con Spring Boot + H2
+├── techconf-frontend/ Aplicación Angular
+├── docs/
+│ └── error_recursion.png
+└── README.md
+
+
+## Cómo ejecutar
+
+**Back-End** (puerto 8080):
 ```bash
+cd techconf-backend
+./mvnw spring-boot:run
+```
+- Consola H2: http://localhost:8080/h2-console
+  (JDBC URL `jdbc:h2:mem:techconfdb`, usuario `sa`, contraseña `password`)
+
+**Front-End** (puerto 4200):
+```bash
+cd techconf-frontend
+npm install
 ng serve
 ```
+- Aplicación: http://localhost:4200
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Endpoints REST
 
-## Code scaffolding
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/api/charlas` | Lista todas las charlas con sus etiquetas y asistentes |
+| POST | `/api/charlas` | Registra una nueva charla |
+| POST | `/api/charlas/{id}/asistentes` | Inscribe un asistente en la charla indicada (400 si es inválido, 404 si la charla no existe) |
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Funcionalidades implementadas
 
-```bash
-ng generate component component-name
-```
+### Back-End
+- **Entidad `Asistente`** (`id`, `nombre` → columna `nombre_completo`, `correo`, `edad`) con
+  validaciones `@NotBlank`, `@Size(min = 3)`, `@Email` y `@Min(18)`.
+- **Relación bidireccional**: `Charla` `@OneToMany(mappedBy = "charla")` ↔ `Asistente`
+  `@ManyToOne @JoinColumn(name = "charla_id")`.
+- **`data.sql`**: 3 charlas, 7 etiquetas y 6 asistentes distribuidos entre las charlas.
+- **Validación en backend** con `@Valid` en el endpoint de inscripción.
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+### Front-End
+- Formulario de charlas con `FormArray` de etiquetas dinámicas y validador cruzado de fechas.
+- Botón **"Inscribir Asistente"** en cada tarjeta que despliega un formulario reactivo
+  **anidado** (`FormGroup asistente` dentro de `FormGroup inscripcionForm`).
+- Validaciones: nombre (requerido, mínimo 3), correo (requerido, formato email),
+  edad (requerida + **validador personalizado** `edadMinimaValidator(18)` en
+  `src/app/validators/edad.validator.ts`).
+- Al inscribir, se hace POST al API y la tarjeta se actualiza mostrando al nuevo asistente.
 
-```bash
-ng generate --help
-```
+## Parte 2: Análisis y depuración del error de recursión infinita
 
-## Building
+### Contexto
+La relación entre `Charla` y `Asistente` es bidireccional:
+- `Charla` tiene `@OneToMany(mappedBy = "charla") List<Asistente> asistentes`
+- `Asistente` tiene `@ManyToOne @JoinColumn(name = "charla_id") Charla charla`
 
-To build the project run:
+### Cómo se provocó el error
+1. Se comentó la anotación `@JsonIgnore` del atributo `charla` en `Asistente.java`.
+2. Se reinició Spring Boot y se consultó `GET http://localhost:8080/api/charlas`.
 
-```bash
-ng build
-```
+### Error obtenido
+Jackson entró en un ciclo infinito al serializar:
+`Charla → asistentes → Asistente → charla → asistentes → Asistente → ...`
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+El servidor respondió con error 500 y la consola mostró la excepción de serialización
+(recursión / profundidad máxima de anidamiento excedida).
 
-## Running unit tests
+![Error de recursión](docs/error_recursion.png)
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+### Procedimiento de solución
+1. Se identificó en el stack trace que el ciclo ocurría entre `Charla.asistentes` y `Asistente.charla`.
+2. Se decidió cortar el ciclo en el lado `@ManyToOne` (`Asistente.charla`), porque el
+   requerimiento pide que al consultar una charla **sí** se devuelva su lista de asistentes.
+3. Se restauró la anotación `@JsonIgnore` sobre `Asistente.charla`.
+4. Se reinició la aplicación y se verificó que `GET /api/charlas` devuelve cada charla con
+   su arreglo `asistentes`, y que cada asistente ya no incluye el campo `charla`.
 
-```bash
-ng test
-```
+### Directivas de Jackson utilizadas
+- **`@JsonIgnore`** (`com.fasterxml.jackson.annotation.JsonIgnore`): excluye el atributo
+  `charla` de la serialización JSON de `Asistente`, rompiendo el ciclo.
 
-## Running end-to-end tests
+Alternativas evaluadas:
+- `@JsonManagedReference` (en `Charla.asistentes`) + `@JsonBackReference` (en `Asistente.charla`).
+- `@JsonIgnoreProperties("asistentes")` sobre `Asistente.charla`.
 
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Se eligió `@JsonIgnore` por ser la opción más simple y la que solicita el enunciado.
