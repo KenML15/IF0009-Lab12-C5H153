@@ -3,7 +3,8 @@ import {
   ReactiveFormsModule, FormBuilder, FormArray, Validators,
   AbstractControl, ValidationErrors, ValidatorFn
 } from '@angular/forms';
-import { CharlaService, Charla } from '../../services/charla.service';
+import { CharlaService, Charla, Asistente } from '../../services/charla.service';
+import { edadMinimaValidator } from '../../validators/edad.validator';
 
 
 export const validarRangoFechas: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
@@ -29,6 +30,8 @@ export class CharlaRegistroComponent implements OnInit {
   charlas = signal<Charla[]>([]);
   mensajeExito = signal('');
 
+
+
   registroForm = this.fb.group({
     titulo: ['', [Validators.required, Validators.minLength(5)]],
     expositor: ['', [Validators.required]],
@@ -50,7 +53,6 @@ export class CharlaRegistroComponent implements OnInit {
     });
   }
 
- 
   get etiquetasArray() {
     return this.registroForm.get('etiquetas') as FormArray;
   }
@@ -64,7 +66,6 @@ export class CharlaRegistroComponent implements OnInit {
       this.etiquetasArray.removeAt(index);
     }
   }
-
 
   get tituloCtrl() { return this.registroForm.get('titulo'); }
   get expositorCtrl() { return this.registroForm.get('expositor'); }
@@ -83,13 +84,66 @@ export class CharlaRegistroComponent implements OnInit {
         this.mensajeExito.set('¡Charla registrada exitosamente!');
         this.charlas.update(lista => [...lista, res]);
 
-
         this.registroForm.reset({ nivel: 'Principiante' });
         while (this.etiquetasArray.length > 1) {
           this.etiquetasArray.removeAt(1);
         }
       },
       error: (err) => console.error(err)
+    });
+  }
+
+
+
+  charlaSeleccionada = signal<number | null>(null); 
+  mensajeInscripcion = signal('');
+  errorInscripcion = signal('');
+
+
+  inscripcionForm = this.fb.group({
+    asistente: this.fb.group({
+      nombre: ['', [Validators.required, Validators.minLength(3)]],
+      correo: ['', [Validators.required, Validators.email]],
+      edad: [null as number | null, [Validators.required, edadMinimaValidator(18)]]
+    })
+  });
+
+  get asistenteGroup() { return this.inscripcionForm.get('asistente')!; }
+  get nombreCtrl() { return this.inscripcionForm.get('asistente.nombre'); }
+  get correoCtrl() { return this.inscripcionForm.get('asistente.correo'); }
+  get edadCtrl() { return this.inscripcionForm.get('asistente.edad'); }
+
+
+  toggleInscripcion(charlaId: number) {
+    this.charlaSeleccionada.set(this.charlaSeleccionada() === charlaId ? null : charlaId);
+    this.inscripcionForm.reset();
+    this.mensajeInscripcion.set('');
+    this.errorInscripcion.set('');
+  }
+
+  onInscribir(charla: Charla): void {
+    if (this.inscripcionForm.invalid) {
+      this.inscripcionForm.markAllAsTouched();
+      return;
+    }
+
+    const asistente = this.asistenteGroup.getRawValue() as Asistente;
+
+    this.charlaService.inscribirAsistente(charla.id!, asistente).subscribe({
+      next: (nuevo) => {
+        this.charlas.update(lista => lista.map(c =>
+          c.id === charla.id
+            ? { ...c, asistentes: [...(c.asistentes ?? []), nuevo] }
+            : c
+        ));
+        this.mensajeInscripcion.set(`${nuevo.nombre} fue inscrito en "${charla.titulo}".`);
+        this.charlaSeleccionada.set(null);
+        this.inscripcionForm.reset();
+      },
+      error: (err) => {
+        console.error(err);
+        this.errorInscripcion.set('No se pudo inscribir al asistente. Revise los datos.');
+      }
     });
   }
 }
