@@ -1,6 +1,6 @@
 # IF0009 - Laboratorio 12: TechConf Full-Stack
 
-**Estudiante:** [Su nombre completo]
+**Estudiante:** Kenneth Miranda León
 **Carné:** C5H153
 **Curso:** IF0009 - Desarrollo de Software IV
 **Profesor:** Mag. Jonathan Granados C.
